@@ -87,6 +87,7 @@ sub parse_options {
     my $help;
     push @getopt_params, 'h|help!' => \$help;
 
+    Getopt::Long::Configure('pass_through') unless $self->must_use_all_command_line_options();
     GetOptions( @getopt_params ) or die "Error in command line arguments\n";
 
     #print Dumper(\@ARGV, $self->{_param_hash}, \%param_hash, $help);

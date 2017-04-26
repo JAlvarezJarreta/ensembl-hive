@@ -18,10 +18,12 @@ use Data::Dumper;
 my %legacy_scripts = (
     'seed_pipeline.pl'  => 'Seed',
     'tweak_pipeline.pl' => 'Tweak',
+    'init_pipeline.pl'  => 'InitPipeline',
 );
 
 my %aliases = (
     'version'   => 'versions',
+    'init'      => 'InitPipeline',
 );
 foreach my $s (keys %legacy_scripts) {
     my $a = $legacy_scripts{$s};
