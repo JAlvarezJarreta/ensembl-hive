@@ -13,7 +13,11 @@ BEGIN {
 
 use Data::Dumper;
 
+use Bio::EnsEMBL::Hive::Utils ('find_submodules');
+
 #use Getopt::Long qw(:config no_auto_abbrev);
+
+my %blacklist = map {$_=>1} qw(Bio::EnsEMBL::Hive::Scripts::BaseScript Bio::EnsEMBL::Hive::Scripts::RunWorker Bio::EnsEMBL::Hive::Scripts::StandaloneJob);
 
 my %legacy_scripts = (
     'seed_pipeline.pl'  => 'Seed',
@@ -21,27 +25,26 @@ my %legacy_scripts = (
     'init_pipeline.pl'  => 'InitPipeline',
 );
 
-my %aliases = (
-    'version'   => 'versions',
+my %recognized_actions = (
+    # Aliases
+    'version'   => 'Versions',
     'init'      => 'InitPipeline',
 );
+
+foreach my $s (@{ find_submodules('Bio::EnsEMBL::Hive::Scripts') }) {
+    next if $blacklist{$s};
+    $s =~ s/Bio::EnsEMBL::Hive::Scripts:://;
+    $recognized_actions{lc $s} = $s;
+}
+
 foreach my $s (keys %legacy_scripts) {
     my $a = $legacy_scripts{$s};
     $s =~ s/\.pl$//;
     # Topup the hash with the script name
-    $aliases{lc $s} = $a;
-
-    if ($s =~ /_/) {
-        # And the version without underscores
-        $s =~ s/_//g;
-    } else {
-        # Or the version with underscores
-        $_ =~ s/([[:lower:]])([[:upper:]])/${1}_${2}/g;   # CamelCase into Camel_Case
-    }
-    $aliases{lc $s} = $a;
+    $recognized_actions{lc $s} = $a;
 }
 
-#print Dumper("aliases", \%aliases);
+#print Dumper(\%recognized_actions);
 
 ## Let's try to find the name of the action
 my $action;
@@ -51,8 +54,8 @@ if ($this_script_name =~ /^hive(\.pl)?/) {
     unless (@ARGV) {
         die "Syntax error. Use $0 <action> <parameters>";
     }
-    $action = lc shift @ARGV;
-    $action = $aliases{$action} || $action;
+    $action = shift @ARGV;
+    $action = $recognized_actions{lc $action} || die "Unrecognized action '$action'. Use one of: ".join(", ", keys %recognized_actions)."\n";
 } else {
     $action = $legacy_scripts{$this_script_name} or die "Unrecognized script name '$this_script_name'";
 }
@@ -61,7 +64,7 @@ my $module_name = 'Bio::EnsEMBL::Hive::Scripts::'.(ucfirst $action);
 
 eval "require $module_name";
 if ($@) {
-    die "Unknown action '$action'. Usage is $0 <action> <parameters>";
+    die "Cannot load the module $module_name for action '$action': $@";
 } else {
     my $script_object = $module_name->new();
     $script_object->main();
