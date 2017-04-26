@@ -110,8 +110,7 @@ sub parse_options {
                     -no_sql_schema_version_check    => $self->param('nosqlvc'),
             ) );
         } else {
-            warn "\nERROR: Connection parameters (url or reg_conf+reg_alias) need to be specified\n";
-            script_usage(1);
+            die "\nERROR: Connection parameters (url or reg_conf+reg_alias) need to be specified\n";
         }
     }
 }
