@@ -52,7 +52,7 @@ my $action;
 my $this_script_name = File::Basename::basename(lc $0);
 if ($this_script_name =~ /^hive(\.pl)?/) {
     unless (@ARGV) {
-        die "Syntax error. Use $0 <action> <parameters>";
+        die "Syntax error. Use $0 <action> <parameters> where <action is one of: ".join(", ", keys %recognized_actions)."\n";
     }
     $action = shift @ARGV;
     $action = $recognized_actions{lc $action} || die "Unrecognized action '$action'. Use one of: ".join(", ", keys %recognized_actions)."\n";
