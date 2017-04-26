@@ -25,10 +25,9 @@ use warnings;
 
 use Data::Dumper;
 use Getopt::Long qw(:config no_auto_abbrev);
+use Pod::Usage;
 
 use Bio::EnsEMBL::Hive::HivePipeline;
-
-use Bio::EnsEMBL::Hive::Utils ('script_usage');
 
 use base ('Bio::EnsEMBL::Hive::Params');
 
@@ -96,7 +95,7 @@ sub parse_options {
         die "ERROR: There are invalid arguments on the command-line: ". join(" ", @ARGV). "\n";
     }
 
-    if ($help) { script_usage(0); }
+    if ($help) { $self->script_usage(0); }
 
     $self->param_init(\%param_hash);
 
@@ -120,5 +119,28 @@ sub main {
     $self->parse_options();
     $self->run();
 }
+
+
+=head2 script_usage
+
+    Description: This function takes one argument (return value).
+                 It uses Pod::Usage to display the POD of the current script module and exits with the return value given.
+
+    Callers    : scripts
+
+=cut
+
+sub script_usage {
+    my ($self, $retvalue) = @_;
+
+    my $path = ref($self).'.pm';
+    $path =~ s/::/\//g;
+    local $0 = $INC{$path};
+    pod2usage(
+        -exitval => $retvalue,
+        -verbose => 2,
+    );
+}
+
 
 1;

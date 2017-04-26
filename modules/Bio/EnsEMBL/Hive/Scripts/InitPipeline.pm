@@ -53,7 +53,7 @@ sub run {
         die "-analysis_topup has been deprecated. Please note this script now *always* runs in -analysis_topup mode.\n";
     }
 
-    my $file_or_module = shift @ARGV or script_usage(0);
+    my $file_or_module = shift @ARGV or $self->script_usage(1);
 
     init_pipeline($file_or_module, $self->param('tweaks'));
 }

@@ -26,7 +26,7 @@ use warnings;
 use Bio::EnsEMBL::Hive::AnalysisJob;
 use Bio::EnsEMBL::Hive::GuestProcess;
 use Bio::EnsEMBL::Hive::HivePipeline;
-use Bio::EnsEMBL::Hive::Utils ('script_usage', 'load_file_or_module', 'parse_cmdline_options', 'stringify', 'destringify');
+use Bio::EnsEMBL::Hive::Utils ('load_file_or_module', 'parse_cmdline_options', 'stringify', 'destringify');
 use Bio::EnsEMBL::Hive::Utils::PCL;
 
 
@@ -108,7 +108,7 @@ sub run {
     }
 
     if (!$module_or_file) {
-        script_usage(1);
+        $self->script_usage(1);
     }
 
     warn "\nRunning '$module_or_file' with input_id='$input_id' :\n";
