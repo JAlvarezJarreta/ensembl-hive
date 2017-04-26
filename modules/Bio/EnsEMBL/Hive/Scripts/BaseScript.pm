@@ -26,6 +26,8 @@ use warnings;
 use Data::Dumper;
 use Getopt::Long qw(:config no_auto_abbrev);
 
+use Bio::EnsEMBL::Hive::HivePipeline;
+
 use Bio::EnsEMBL::Hive::Utils ('script_usage');
 
 use base ('Bio::EnsEMBL::Hive::Params');
