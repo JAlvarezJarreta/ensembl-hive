@@ -17,7 +17,7 @@ use Bio::EnsEMBL::Hive::Utils ('find_submodules');
 
 #use Getopt::Long qw(:config no_auto_abbrev);
 
-my %blacklist = map {$_=>1} qw(Bio::EnsEMBL::Hive::Scripts::BaseScript Bio::EnsEMBL::Hive::Scripts::RunWorker Bio::EnsEMBL::Hive::Scripts::StandaloneJob);
+my %blacklist = map {$_=>1} qw(Bio::EnsEMBL::Hive::Scripts::BaseScript Bio::EnsEMBL::Hive::Scripts::RunWorker);
 
 my %legacy_scripts = (
     'seed_pipeline.pl'  => 'Seed',
