@@ -60,9 +60,11 @@ sub parse_options {
         my $param_init_value;
 
         # Default value and parameter name
-        if (ref $options_as_hash{$opt}) {
+        if (ref($options_as_hash{$opt}) eq 'ARRAY') {
             $param_name = $options_as_hash{$opt}->[0];
             $param_init_value = $options_as_hash{$opt}->[1];
+        } elsif (ref($options_as_hash{$opt}) eq 'CODE') {
+            $param_init_value = $options_as_hash{$opt};
         } else {
             $param_name = $options_as_hash{$opt};
             if ($opt =~ /\@/) {
@@ -70,8 +72,12 @@ sub parse_options {
             }
         }
 
-        $param_hash{$param_name} = $param_init_value;
-        push @getopt_params, $opt => \$param_hash{$param_name}
+        if ($param_name) {
+            $param_hash{$param_name} = $param_init_value;
+            push @getopt_params, $opt => (ref $param_init_value ? $param_init_value : \$param_hash{$param_name});
+        } else {
+            push @getopt_params, $opt => $param_init_value;
+        }
     }
 
     #print Dumper(\@getopt_params, \@ARGV, $self->{_param_hash}, \%param_hash);

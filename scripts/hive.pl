@@ -17,6 +17,7 @@ use Data::Dumper;
 
 my %legacy_scripts = (
     'seed_pipeline.pl'  => 'Seed',
+    'tweak_pipeline.pl' => 'Tweak',
 );
 
 my %aliases = (
