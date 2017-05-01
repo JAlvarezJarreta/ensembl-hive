@@ -25,6 +25,7 @@ my %legacy_scripts = (
     'runWorker.pl'      => 'RunWorker',
     'generate_timeline.pl'  => 'Timeline',
     'generate_graph.pl'     => 'AnalysisDiagram',
+    'visualize_jobs.pl'     => 'JobDiagram',
 );
 
 my %recognized_actions = (
