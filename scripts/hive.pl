@@ -23,6 +23,7 @@ my %legacy_scripts = (
     'init_pipeline.pl'  => 'InitPipeline',
     'db_cmd.pl'         => 'DbCmd',
     'runWorker.pl'      => 'RunWorker',
+    'generate_timeline.pl'  => 'Timeline',
 );
 
 my %recognized_actions = (
