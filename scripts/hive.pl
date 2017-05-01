@@ -23,6 +23,7 @@ my %legacy_scripts = (
     'seed_pipeline.pl'  => 'Seed',
     'tweak_pipeline.pl' => 'Tweak',
     'init_pipeline.pl'  => 'InitPipeline',
+    'db_cmd.pl'         => 'DbCmd',
 );
 
 my %recognized_actions = (
