@@ -17,23 +17,23 @@ use Bio::EnsEMBL::Hive::Utils ('find_submodules');
 
 #use Getopt::Long qw(:config no_auto_abbrev);
 
-my %blacklist = map {$_=>1} qw(Bio::EnsEMBL::Hive::Scripts::BaseScript Bio::EnsEMBL::Hive::Scripts::RunWorker);
-
 my %legacy_scripts = (
     'seed_pipeline.pl'  => 'Seed',
     'tweak_pipeline.pl' => 'Tweak',
     'init_pipeline.pl'  => 'InitPipeline',
     'db_cmd.pl'         => 'DbCmd',
+    'runWorker.pl'      => 'RunWorker',
 );
 
 my %recognized_actions = (
     # Aliases
     'version'   => 'Versions',
     'init'      => 'InitPipeline',
+    'worker'    => 'RunWorker',
 );
 
 foreach my $s (@{ find_submodules('Bio::EnsEMBL::Hive::Scripts') }) {
-    next if $blacklist{$s};
+    next if $s eq 'Bio::EnsEMBL::Hive::Scripts::BaseScript';
     $s =~ s/Bio::EnsEMBL::Hive::Scripts:://;
     $recognized_actions{lc $s} = $s;
 }

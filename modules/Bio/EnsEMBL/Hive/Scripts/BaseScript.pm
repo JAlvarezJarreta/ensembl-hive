@@ -101,8 +101,21 @@ sub parse_options {
 
     if ($self->add_connection_command_line_options()) {
         if($self->param('url') or $self->param('reg_alias')) {
+
+            # Perform environment variable substitution separately with and without curly braces.
+            #       Fixme: Perl 5.10 has a cute new "branch reset" (?|pattern)
+            #              that would allow to merge the two substitutions below into a nice one-liner.
+            #              But people around may still be using Perl 5.8, so let's wait a bit.
+            #
+            # Make sure expressions stay as they were if we were unable to substitute them.
+            my $url = $self->param('url');
+            if($url) {
+                $url =~ s/\$(\{(\w+)\})/defined($ENV{$2})?"$ENV{$2}":"\$$1"/eg;
+                $url =~ s/\$((\w+))/defined($ENV{$2})?"$ENV{$2}":"\$$1"/eg;
+            }
+
             $self->param('pipeline', Bio::EnsEMBL::Hive::HivePipeline->new(
-                    -url                            => $self->param('url'),
+                    -url                            => $url,
                     -reg_conf                       => $self->param('reg_conf'),
                     -reg_type                       => $self->param('reg_type'),
                     -reg_alias                      => $self->param('reg_alias'),
