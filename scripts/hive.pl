@@ -27,6 +27,7 @@ my %legacy_scripts = (
     'generate_timeline.pl'  => 'Timeline',
     'generate_graph.pl'     => 'AnalysisDiagram',
     'visualize_jobs.pl'     => 'JobDiagram',
+    'load_resource_usage.pl'    => 'LoadResourceUsage',
 );
 
 my %recognized_actions = (
