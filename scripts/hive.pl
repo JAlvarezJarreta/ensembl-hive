@@ -23,6 +23,7 @@ my %legacy_scripts = (
     'init_pipeline.pl'  => 'InitPipeline',
     'db_cmd.pl'         => 'DbCmd',
     'runWorker.pl'      => 'RunWorker',
+    'hoover_pipeline.pl'    => 'Hoover',
     'generate_timeline.pl'  => 'Timeline',
     'generate_graph.pl'     => 'AnalysisDiagram',
     'visualize_jobs.pl'     => 'JobDiagram',
