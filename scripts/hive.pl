@@ -24,6 +24,7 @@ my %legacy_scripts = (
     'db_cmd.pl'         => 'DbCmd',
     'runWorker.pl'      => 'RunWorker',
     'generate_timeline.pl'  => 'Timeline',
+    'generate_graph.pl'     => 'AnalysisDiagram',
 );
 
 my %recognized_actions = (
