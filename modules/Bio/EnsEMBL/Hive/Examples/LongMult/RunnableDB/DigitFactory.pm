@@ -124,6 +124,10 @@ sub write_output {  # nothing to write out, but some dataflow to perform:
 
     $self->warning('Attempted to create '.scalar(@$sub_tasks)." multiplication jobs");     # warning messages get recorded into 'log_message' table
 
+    $self->throw('end', 'analysis');
+    #$self->attempt->lethality_level('beekeeper');
+    #$self->attempt->lethality_level('worker');
+
 ## extra information sent to the funnel will extend its stack:
 #    $self->dataflow_output_id( { 'different_digits' => scalar(@$sub_tasks) } , 1);
 }

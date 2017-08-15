@@ -563,8 +563,26 @@ sub dataflow_output_id {
 }
 
 
+my %allowed_failure_levels = map {$_ => 1} qw(attempt job analysis);
+my %allowed_lethality_levels = map {$_ => 1} qw(role worker beekeeper);
 sub throw {
-    my $msg = pop @_;
+    my ($self, $msg, $failure_level, $lethality_level) = @_;
+
+    if ((defined $lethality_level) && !$allowed_lethality_levels{$lethality_level}) {
+        $msg = "Unrecognized \$lethality_level '$lethality_level' whilst throwing:\n$msg";
+    } elsif ($lethality_level) {
+        $self->attempt->lethality_level($lethality_level);
+    } else {
+        $lethality_level = $self->attempt->lethality_level // 'worker';
+    }
+
+    if ((defined $failure_level) && !$allowed_failure_levels{$failure_level}) {
+        $msg = "Unrecognized \$failure_level '$failure_level' whilst throwing:\n$msg"
+    } elsif ($failure_level) {
+        $self->attempt->failure_level($failure_level);
+    } else {
+        $failure_level = $self->attempt->failure_level;
+    }
 
     Bio::EnsEMBL::Hive::Utils::throw( $msg );   # this module doesn't import 'throw' to avoid namespace clash
 }
