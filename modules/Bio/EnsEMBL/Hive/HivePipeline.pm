@@ -22,6 +22,8 @@ package Bio::EnsEMBL::Hive::HivePipeline;
 use strict;
 use warnings;
 
+use Scalar::Util qw(weaken);
+
 use Bio::EnsEMBL::Hive::TheApiary;
 use Bio::EnsEMBL::Hive::DBSQL::DBAdaptor;
 use Bio::EnsEMBL::Hive::Utils ('stringify', 'destringify', 'throw');
@@ -185,6 +187,45 @@ sub test_connections {
     if (@warnings) {
         push @warnings, '', 'Please fix these before running the pipeline';
         warn join("\n", '', '# ' . '-' x 26 . '[WARNINGS]' . '-' x 26, '', @warnings), "\n";
+    }
+}
+
+
+# Store all the connections between objects (as weak references) to avoid
+# having to search through the collections every time
+sub make_connections {
+    my $self = shift;
+
+    # Analysis <-> AnalysisStats
+    my %stats_by_analysis_id;
+    foreach my $stats ($self->collection_of( 'AnalysisStats' )->list) {
+        if ($stats->{'analysis'}) {
+            unless ($stats->{'analysis'}->{'_stats'}) {
+                $stats->{'analysis'}->{'_stats'} = $stats;
+                weaken($stats->{'analysis'}->{'_stats'});
+            }
+        } elsif ($stats->{'analysis_id'}) {
+            $stats_by_analysis_id{ $stats->{'analysis_id'} } = $stats;
+        } else {
+            # orphan stats - no link to an analysis
+        }
+    }
+    foreach my $analysis ($self->collection_of( 'Analysis' )->list) {
+        if ($analysis->{'_stats'}) {
+            unless ($analysis->{'_stats'}->{'analysis'}) {
+                $analysis->{'_stats'}->{'analysis'} = $analysis;
+                weaken($analysis->{'_stats'}->{'analysis'});
+            }
+        } elsif ($analysis->dbID) {
+            if (my $stats = $stats_by_analysis_id{ $analysis->dbID }) {
+                $analysis->{'_stats'} = $stats;
+                weaken($analysis->{'_stats'});
+            } else {
+                # no stats match this analysis_id !
+            }
+        } else {
+            # orphan analysis - no link to any stats
+        }
     }
 }
 

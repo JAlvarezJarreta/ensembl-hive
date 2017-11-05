@@ -224,11 +224,7 @@ sub display_name {
 sub stats {
     my $self = shift @_;
 
-    unless ($self->{'_stats'}) {
-        $self->{'_stats'} = $self->hive_pipeline->collection_of( 'AnalysisStats' )->find_one_by('analysis', $self);
-        # weaken the reference to avoid a reference cycle
-        weaken($self->{'_stats'});
-    }
+    $self->hive_pipeline->make_connections unless $self->{'_stats'};
     return $self->{'_stats'};
 }
 
