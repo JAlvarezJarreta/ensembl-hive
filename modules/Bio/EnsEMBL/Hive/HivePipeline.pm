@@ -28,6 +28,7 @@ use Bio::EnsEMBL::Hive::TheApiary;
 use Bio::EnsEMBL::Hive::DBSQL::DBAdaptor;
 use Bio::EnsEMBL::Hive::Utils ('stringify', 'destringify', 'throw');
 use Bio::EnsEMBL::Hive::Utils::Collection;
+use Bio::EnsEMBL::Hive::Utils::HashCollection;
 use Bio::EnsEMBL::Hive::Utils::PCL;
 use Bio::EnsEMBL::Hive::Utils::URL;
 
@@ -89,6 +90,11 @@ sub unambig_key {   # based on DBC's URL if present, otherwise on pipeline_name
 }
 
 
+my %hash_keys = (
+    'MetaParameters'            => 'meta_key',
+    'PipelineWideParameters'    => 'param_name',
+);
+
 sub collection_of {
     my $self = shift @_;
     my $type = shift @_;
@@ -108,7 +114,11 @@ sub collection_of {
         } else {
 #            warn "initializing collection_of($type) as an empty one\n";
         }
-        $self->{'_cache_by_class'}->{$type} = Bio::EnsEMBL::Hive::Utils::Collection->new( $all_objects );
+        if (my $unique_attr = $hash_keys{$type}) {
+            $self->{'_cache_by_class'}->{$type} = Bio::EnsEMBL::Hive::Utils::HashCollection->new( $all_objects, $unique_attr );
+        } else {
+            $self->{'_cache_by_class'}->{$type} = Bio::EnsEMBL::Hive::Utils::Collection->new( $all_objects );
+        }
     }
 
     return $self->{'_cache_by_class'}->{$type};
