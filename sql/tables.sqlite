@@ -339,12 +339,11 @@ CREATE TABLE job (
     when_created            TIMESTAMP   NOT NULL DEFAULT CURRENT_TIMESTAMP,
     role_id                 INTEGER              DEFAULT NULL,
     last_attempt_id         INTEGER              DEFAULT NULL,  -- the last attempt registered for this job
-    status                  TEXT        NOT NULL DEFAULT 'READY',   -- expected values: 'SEMAPHORED','READY','CLAIMED','IN_PROGRESS','DONE','FAILED','PASSED_ON'
+    status                  TEXT        NOT NULL DEFAULT 'READY',   -- expected values: 'SEMAPHORED','READY','CLAIMED','IN_PROGRESS','DONE','FAILED','PASSED_ON','REDUNDANT'
 
     controlled_semaphore_id INTEGER              DEFAULT NULL       -- terminology: fan jobs CONTROL semaphores; funnel jobs or remote semaphores DEPEND ON (local) semaphores
 );
-CREATE UNIQUE INDEX job_input_id_stacks_analysis_idx ON job (input_id, param_id_stack, accu_id_stack, analysis_id);
-CREATE        INDEX job_analysis_status_attempted_idx ON job (analysis_id, status, last_attempt_id);
+CREATE        INDEX job_analysis_status_virgin_idx ON job (analysis_id, status, last_attempt_id);
 CREATE        INDEX job_role_id_status_id_idx ON job (role_id);
 
 /**
@@ -370,17 +369,28 @@ CREATE TABLE attempt (
     attempt_id              INTEGER     NOT NULL PRIMARY KEY AUTOINCREMENT,
     role_id                 INTEGER     NOT NULL,
     job_id                  INTEGER     NOT NULL,                  -- the job this attempt is about
-    status                  TEXT        NOT NULL DEFAULT 'INITIALIZATION',          -- expected values: 'INITIALIZATION','PRE_CLEANUP','FETCH_INPUT','RUN','WRITE_OUTPUT','POST_HEALTHCHECK','POST_CLEANUP','END'
+    status                  TEXT        NOT NULL DEFAULT 'INITIALIZATION',          -- expected values: 'INITIALIZATION','PARAM_CHECK','PRE_CLEANUP','FETCH_INPUT','RUN','WRITE_OUTPUT','POST_HEALTHCHECK','POST_CLEANUP','END'
     when_initialized        TIMESTAMP   NOT NULL DEFAULT CURRENT_TIMESTAMP,
     when_updated            TIMESTAMP                    NULL,      -- mysql's special for "TIMESTAMP DEFAULT NULL"
     when_ended              TIMESTAMP                    NULL,      -- mysql's special for "TIMESTAMP DEFAULT NULL"
     is_success              INTEGER,
+    param_checksum          CHAR(32),
     runtime_msec            INTEGER              DEFAULT NULL,
     query_count             INTEGER              DEFAULT NULL,
     stdout_file             VARCHAR(255),
     stderr_file             VARCHAR(255)
 );
 CREATE        INDEX attempt_job_id ON attempt (job_id);                                   -- for finding the attempts linked to a job
+
+
+CREATE TABLE unique_job (
+    analysis_id             INTEGER     NOT NULL,
+    param_checksum          CHAR(32)    NOT NULL,
+    representative_job_id   INTEGER     NOT NULL,
+
+    PRIMARY KEY (analysis_id, param_checksum)                                   -- to avoid repeating tasks
+);
+CREATE        INDEX unique_job_representative_job_id ON unique_job (representative_job_id);
 
 
 /**

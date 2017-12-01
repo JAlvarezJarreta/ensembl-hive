@@ -75,6 +75,12 @@ sub when_ended {
     return $self->{'_when_ended'};
 }
 
+sub param_checksum {
+    my $self = shift;
+    $self->{'_param_checksum'} = shift if(@_);
+    return $self->{'_param_checksum'};
+}
+
 sub runtime_msec {
     my $self = shift;
     $self->{'_runtime_msec'} = shift if(@_);

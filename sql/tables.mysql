@@ -343,12 +343,11 @@ CREATE TABLE job (
     when_created            TIMESTAMP   NOT NULL DEFAULT CURRENT_TIMESTAMP,
     role_id                 INTEGER              DEFAULT NULL,
     last_attempt_id         INTEGER              DEFAULT NULL,  -- the last attempt registered for this job
-    status                  ENUM('SEMAPHORED','READY','CLAIMED','IN_PROGRESS','DONE','FAILED','PASSED_ON') DEFAULT 'READY' NOT NULL,
+    status                  ENUM('SEMAPHORED','READY','CLAIMED','IN_PROGRESS','DONE','FAILED','PASSED_ON','REDUNDANT') DEFAULT 'READY' NOT NULL,
 
     controlled_semaphore_id INTEGER              DEFAULT NULL,      -- terminology: fan jobs CONTROL semaphores; funnel jobs or remote semaphores DEPEND ON (local) semaphores
 
-    UNIQUE  KEY input_id_stacks_analysis    (input_id, param_id_stack, accu_id_stack, analysis_id), -- to avoid repeating tasks
-            KEY analysis_status_attempted   (analysis_id, status, last_attempt_id),                 -- for claiming jobs
+    UNIQUE  KEY analysis_status_virgin      (analysis_id, status, last_attempt_id),                 -- for claiming jobs
             KEY role_status                 (role_id, status)                                       -- for fetching and releasing claimed jobs
 ) COLLATE=latin1_swedish_ci ENGINE=InnoDB;
 
@@ -375,11 +374,12 @@ CREATE TABLE attempt (
     attempt_id              INTEGER     NOT NULL PRIMARY KEY AUTO_INCREMENT,
     role_id                 INTEGER     NOT NULL,
     job_id                  INTEGER     NOT NULL,                  -- the job this attempt is about
-    status                  ENUM('INITIALIZATION','PRE_CLEANUP','FETCH_INPUT','RUN','WRITE_OUTPUT','POST_HEALTHCHECK','POST_CLEANUP','END') DEFAULT 'INITIALIZATION' NOT NULL,
+    status                  ENUM('INITIALIZATION','PARAM_CHECK','PRE_CLEANUP','FETCH_INPUT','RUN','WRITE_OUTPUT','POST_HEALTHCHECK','POST_CLEANUP','END') DEFAULT 'INITIALIZATION' NOT NULL,
     when_initialized        TIMESTAMP   NOT NULL DEFAULT CURRENT_TIMESTAMP,
     when_updated            TIMESTAMP                    NULL,      -- mysql's special for "TIMESTAMP DEFAULT NULL"
     when_ended              TIMESTAMP                    NULL,      -- mysql's special for "TIMESTAMP DEFAULT NULL"
     is_success              TINYINT(1),
+    param_checksum          CHAR(32),
     runtime_msec            INTEGER              DEFAULT NULL,
     query_count             INTEGER              DEFAULT NULL,
     stdout_file             VARCHAR(255),
@@ -387,6 +387,30 @@ CREATE TABLE attempt (
 
             KEY job_id                      (job_id)                                                -- for finding the attempts linked to a job
 ) COLLATE=latin1_swedish_ci ENGINE=InnoDB;
+
+/**
+@table  unique_job
+
+@colour #1D73DA
+
+@desc The unique_job table ensures that a in each analysis, a given task (defined by its parameters) is only run once.
+      We record their pairs of (analysis_id, param_checksum) and the matching job_id. When new jobs are tried but are
+      found in this table, they are aborted.
+
+@column analysis_id             the analysis_id needed to accomplish this job.
+@column param_checksum          checksum over all the job parameters (input_id and accumulator, incl. inherited ones)
+@column representative_job_id   points at the job that has been selected to run this analysis with these parameters
+*/
+
+CREATE TABLE unique_job (
+    analysis_id             INTEGER     NOT NULL,
+    param_checksum          CHAR(32)    NOT NULL,
+    representative_job_id   INTEGER     NOT NULL,
+
+    PRIMARY KEY analysis_params       (analysis_id, param_checksum),                                  -- to avoid repeating tasks
+            KEY representative_job_id (representative_job_id)
+) COLLATE=latin1_swedish_ci ENGINE=InnoDB;
+
 
 /**
 @table  semaphore

@@ -45,7 +45,7 @@ use Term::ANSIColor;
 use base ( 'Bio::EnsEMBL::Hive::Storable' );
 
 # How to map the job statuses to the counters
-our %status2counter = ('FAILED' => 'failed_job_count', 'READY' => 'ready_job_count', 'DONE' => 'done_job_count', 'PASSED_ON' => 'done_job_count', 'SEMAPHORED' => 'semaphored_job_count');
+our %status2counter = ('FAILED' => 'failed_job_count', 'READY' => 'ready_job_count', 'DONE' => 'done_job_count', 'PASSED_ON' => 'done_job_count', 'REDUNDANT' => 'done_job_count', 'SEMAPHORED' => 'semaphored_job_count');
 
 
 sub unikey {    # override the default from Cacheable parent

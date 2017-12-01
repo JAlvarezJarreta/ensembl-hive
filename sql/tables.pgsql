@@ -334,7 +334,7 @@ CREATE TABLE resource_description (
 @column controlled_semaphore_id the dbID of the semaphore that is controlled by this job (and whose counter it will decrement by 1 upon successful completion)
 */
 
-CREATE TYPE job_status AS ENUM ('SEMAPHORED','READY','CLAIMED','IN_PROGRESS','DONE','FAILED','PASSED_ON');
+CREATE TYPE job_status AS ENUM ('SEMAPHORED','READY','CLAIMED','IN_PROGRESS','DONE','FAILED','PASSED_ON','REDUNDANT');
 CREATE TABLE job (
     job_id                  SERIAL PRIMARY KEY,
     prev_job_id             INTEGER              DEFAULT NULL,  -- the job that created this one using a dataflow rule
@@ -347,24 +347,21 @@ CREATE TABLE job (
     last_attempt_id         INTEGER              DEFAULT NULL,  -- the last attempt registered for this job
     status                  job_status  NOT NULL DEFAULT 'READY',
 
-    controlled_semaphore_id INTEGER              DEFAULT NULL,      -- terminology: fan jobs CONTROL semaphores; funnel jobs or remote semaphores DEPEND ON (local) semaphores
-
-    UNIQUE (input_id, param_id_stack, accu_id_stack, analysis_id)   -- to avoid repeating tasks
+    controlled_semaphore_id INTEGER              DEFAULT NULL       -- terminology: fan jobs CONTROL semaphores; funnel jobs or remote semaphores DEPEND ON (local) semaphores
 );
 CREATE INDEX ON job (analysis_id, status, last_attempt_id); -- for claiming jobs
 CREATE INDEX ON job (role_id, status);                  -- for fetching and releasing claimed jobs
 
-/*
--- PostgreSQL is lacking INSERT IGNORE, so we need a RULE to silently
--- discard the insertion of duplicated entries in the job table
-CREATE OR REPLACE RULE job_table_ignore_duplicate_inserts AS
-    ON INSERT TO job
-    WHERE EXISTS (
-	SELECT 1
-	FROM job
-	WHERE job.input_id=NEW.input_id AND job.param_id_stack=NEW.param_id_stack AND job.accu_id_stack=NEW.accu_id_stack AND job.analysis_id=NEW.analysis_id)
-    DO INSTEAD NOTHING;
-*/
+
+CREATE TABLE unique_job (
+    analysis_id             INTEGER     NOT NULL,
+    param_checksum          CHAR(32)    NOT NULL,
+    representative_job_id   INTEGER     NOT NULL,
+
+    PRIMARY KEY (analysis_id, param_checksum)                                   -- to avoid repeating tasks
+);
+CREATE INDEX ON unique_job (representative_job_id);
+
 
 /**
 @table  attempt
@@ -385,7 +382,7 @@ CREATE OR REPLACE RULE job_table_ignore_duplicate_inserts AS
 @column stderr_file            path to the job's STDERR log
 */
 
-CREATE TYPE attempt_status AS ENUM ('INITIALIZATION','PRE_CLEANUP','FETCH_INPUT','RUN','WRITE_OUTPUT','POST_HEALTHCHECK','POST_CLEANUP','END');
+CREATE TYPE attempt_status AS ENUM ('INITIALIZATION','PARAM_CHECK','PRE_CLEANUP','FETCH_INPUT','RUN','WRITE_OUTPUT','POST_HEALTHCHECK','POST_CLEANUP','END');
 CREATE TABLE attempt (
     attempt_id              SERIAL PRIMARY KEY,
     role_id                 INTEGER     NOT NULL,
@@ -395,6 +392,7 @@ CREATE TABLE attempt (
     when_updated            TIMESTAMP                    NULL,      -- mysql's special for "TIMESTAMP DEFAULT NULL"
     when_ended              TIMESTAMP                    NULL,      -- mysql's special for "TIMESTAMP DEFAULT NULL"
     is_success              SMALLINT,
+    param_checksum          CHAR(32),
     runtime_msec            INTEGER              DEFAULT NULL,
     query_count             INTEGER              DEFAULT NULL,
     stdout_file             VARCHAR(255),

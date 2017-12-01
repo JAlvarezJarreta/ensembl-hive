@@ -587,6 +587,7 @@ sub run {
         #
         if($jobs_done_by_batches_loop) {
 
+            $self->worker_say("Worker::run did $jobs_done_by_batches_loop");
             $self->adaptor->db->get_AnalysisStatsAdaptor->interval_update_work_done(
                 $self->current_role->analysis->dbID,
                 $jobs_done_by_batches_loop,
@@ -761,11 +762,13 @@ sub run_one_batch {
 
             # whether the job completed successfully or not:
         $self->runnable_object->attempt( undef );   # release an extra reference to the job
+
         $attempt->runtime_msec( $job_stopwatch->get_elapsed );
         $attempt->query_count( $self->adaptor->db->dbc->query_count );
         $attempt->adaptor->record_attempt_completion($attempt, $job->died_somewhere ? 0 : 1);
 
-        my $job_completion_line = "Job $job_id : ". ($job->died_somewhere ? 'died' : 'complete' );
+        my $is_redundant = $job_partial_timing && ("$job_partial_timing" eq 'is_redundant');
+        my $job_completion_line = "Job $job_id : ". ($job->died_somewhere ? 'died' : ($is_redundant ? 'redundant' : 'complete') );
 
         print "\n$job_completion_line\n" if($self->log_dir and ($self->debug or $job->died_somewhere));         # one copy goes to the job's STDERR
         $self->stop_job_output_redirection($attempt);                                                           # and then we switch back to worker's STDERR
@@ -790,9 +793,9 @@ sub run_one_batch {
                 last ONE_BATCH;
             }
         } else {    # job successfully completed:
-            $self->more_work_done( $job_partial_timing );
+            $self->more_work_done( $job_partial_timing ) unless $is_redundant;
             $jobs_done_here++;
-            $job->set_and_update_status('DONE');
+            $job->set_and_update_status($is_redundant ? 'REDUNDANT' : 'DONE');
 
             if( my $controlled_semaphore = $job->controlled_semaphore ) {
                 $controlled_semaphore->decrease_by( [ $job ] );
@@ -832,6 +835,7 @@ sub run_one_batch {
 
     } # /while(my $job = shift @$jobs)
 
+    $self->worker_say("Worker::run_one_batch did $jobs_done_here");
     return $jobs_done_here;
 }
 
