@@ -125,6 +125,7 @@ sub life_cycle {
     my $job = $self->input_job();
     my $partial_stopwatch = Bio::EnsEMBL::Hive::Utils::Stopwatch->new();
     my %job_partial_timing = ();
+    my $is_redundant;
 
     $job->incomplete(1);    # reinforce, in case the life_cycle is not run by a Worker
     $job->autoflow(1);
@@ -132,6 +133,17 @@ sub life_cycle {
     eval {
         # Catch all the "warn" calls
         #$SIG{__WARN__} = sub { $self->warning(@_) };
+
+        if ($self->input_job->adaptor) {
+            $self->enter_status('PARAM_CHECK');
+
+            $is_redundant = $self->input_job->adaptor->check_job_uniqueness($self->input_job);
+
+            if ($is_redundant) {
+                $job->incomplete(0);
+                return;
+            }
+        }
 
         if( $self->can('pre_cleanup') and $job->retry_count()>0 ) {
             $self->enter_status('PRE_CLEANUP');
@@ -166,6 +178,8 @@ sub life_cycle {
     };
     # Restore the default handler
     #$SIG{__WARN__} = 'DEFAULT';
+
+    return 'is_redundant' if $is_redundant;
 
     if(my $life_cycle_msg = $@) {
         $job->died_somewhere( $job->incomplete );  # it will be OR'd inside

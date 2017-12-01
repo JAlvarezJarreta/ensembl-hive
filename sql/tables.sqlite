@@ -347,9 +347,18 @@ CREATE TABLE job (
 
     controlled_semaphore_id INTEGER              DEFAULT NULL       -- terminology: fan jobs CONTROL semaphores; funnel jobs or remote semaphores DEPEND ON (local) semaphores
 );
-CREATE UNIQUE INDEX job_input_id_stacks_analysis_idx ON job (input_id, param_id_stack, accu_id_stack, analysis_id);
 CREATE        INDEX job_analysis_status_retry_idx ON job (analysis_id, status, retry_count);
 CREATE        INDEX job_role_id_status_id_idx ON job (role_id);
+
+
+CREATE TABLE unique_job (
+    analysis_id             INTEGER     NOT NULL,
+    param_checksum          CHAR(32)    NOT NULL,
+    representative_job_id   INTEGER     NOT NULL,
+
+    PRIMARY KEY (analysis_id, param_checksum)                                   -- to avoid repeating tasks
+);
+CREATE        INDEX unique_job_representative_job_id ON unique_job (representative_job_id);
 
 
 /**

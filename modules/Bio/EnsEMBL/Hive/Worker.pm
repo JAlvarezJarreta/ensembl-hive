@@ -735,12 +735,14 @@ sub run_one_batch {
             Bio::EnsEMBL::Hive::Process::warning($self->runnable_object, $msg, $job->incomplete?'WORKER_ERROR':'INFO');   # In case the Runnable has redefined warning()
         }
 
+        my $is_redundant = $job_partial_timing && ("$job_partial_timing" eq 'is_redundant');
+
             # whether the job completed successfully or not:
         $self->runnable_object->input_job( undef );   # release an extra reference to the job
         $job->runtime_msec( $job_stopwatch->get_elapsed );
         $job->query_count( $self->adaptor->db->dbc->query_count );
 
-        my $job_completion_line = "Job $job_id : ". ($job->died_somewhere ? 'died' : 'complete' );
+        my $job_completion_line = "Job $job_id : ". ($job->died_somewhere ? 'died' : ($is_redundant ? 'redundant' : 'complete') );
 
         print "\n$job_completion_line\n" if($self->log_dir and ($self->debug or $job->died_somewhere));         # one copy goes to the job's STDERR
         $self->stop_job_output_redirection($job);                                                               # and then we switch back to worker's STDERR
@@ -765,9 +767,9 @@ sub run_one_batch {
                 last ONE_BATCH;
             }
         } else {    # job successfully completed:
-            $self->more_work_done( $job_partial_timing );
+            $self->more_work_done( $job_partial_timing ) unless $is_redundant;
             $jobs_done_here++;
-            $job->set_and_update_status('DONE');
+            $job->set_and_update_status($is_redundant ? 'REDUNDANT' : 'DONE');
 
             if( my $controlled_semaphore = $job->controlled_semaphore ) {
                 $controlled_semaphore->decrease_by( [ $job ] );

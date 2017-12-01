@@ -343,7 +343,7 @@ CREATE TABLE job (
     param_id_stack          CHAR(64)    NOT NULL DEFAULT '',
     accu_id_stack           CHAR(64)    NOT NULL DEFAULT '',
     role_id                 INTEGER              DEFAULT NULL,
-    status                  ENUM('SEMAPHORED','READY','CLAIMED','COMPILATION','PRE_CLEANUP','FETCH_INPUT','RUN','WRITE_OUTPUT','POST_HEALTHCHECK','POST_CLEANUP','DONE','FAILED','PASSED_ON') DEFAULT 'READY' NOT NULL,
+    status                  ENUM('SEMAPHORED','READY','CLAIMED','COMPILATION','PARAM_CHECK','PRE_CLEANUP','FETCH_INPUT','RUN','WRITE_OUTPUT','POST_HEALTHCHECK','POST_CLEANUP','DONE','FAILED','PASSED_ON','REDUNDANT') DEFAULT 'READY' NOT NULL,
     retry_count             INTEGER     NOT NULL DEFAULT 0,
     when_completed          TIMESTAMP                    NULL,      -- mysql's special for "TIMESTAMP DEFAULT NULL"
     runtime_msec            INTEGER              DEFAULT NULL,
@@ -351,9 +351,32 @@ CREATE TABLE job (
 
     controlled_semaphore_id INTEGER              DEFAULT NULL,      -- terminology: fan jobs CONTROL semaphores; funnel jobs or remote semaphores DEPEND ON (local) semaphores
 
-    UNIQUE  KEY input_id_stacks_analysis    (input_id, param_id_stack, accu_id_stack, analysis_id), -- to avoid repeating tasks
             KEY analysis_status_retry       (analysis_id, status, retry_count),                     -- for claiming jobs
             KEY role_status                 (role_id, status)                                       -- for fetching and releasing claimed jobs
+) COLLATE=latin1_swedish_ci ENGINE=InnoDB;
+
+
+/**
+@table  unique_job
+
+@colour #1D73DA
+
+@desc The unique_job table ensures that a in each analysis, a given task (defined by its parameters) is only run once.
+      We record their pairs of (analysis_id, param_checksum) and the matching job_id. When new jobs are tried but are
+      found in this table, they are aborted.
+
+@column analysis_id             the analysis_id needed to accomplish this job.
+@column param_checksum          checksum over all the job parameters (input_id and accumulator, incl. inherited ones)
+@column representative_job_id   points at the job that has been selected to run this analysis with these parameters
+*/
+
+CREATE TABLE unique_job (
+    analysis_id             INTEGER     NOT NULL,
+    param_checksum          CHAR(32)    NOT NULL,
+    representative_job_id   INTEGER     NOT NULL,
+
+    PRIMARY KEY analysis_params       (analysis_id, param_checksum),                                  -- to avoid repeating tasks
+            KEY representative_job_id (representative_job_id)
 ) COLLATE=latin1_swedish_ci ENGINE=InnoDB;
 
 

@@ -45,6 +45,8 @@ package Bio::EnsEMBL::Hive::DBSQL::AnalysisJobAdaptor;
 use strict;
 use warnings;
 
+use Digest::MD5 qw(md5_hex);
+
 use Bio::EnsEMBL::Hive::Cacheable;
 use Bio::EnsEMBL::Hive::Semaphore;
 use Bio::EnsEMBL::Hive::DBSQL::DataflowRuleAdaptor;
@@ -57,7 +59,7 @@ use base ('Bio::EnsEMBL::Hive::DBSQL::ObjectAdaptor');
 # They are used in a number of queries.
 our $ALL_STATUSES_OF_RUNNING_JOBS = q{'PRE_CLEANUP','FETCH_INPUT','RUN','WRITE_OUTPUT','POST_HEALTHCHECK','POST_CLEANUP'};
 our $ALL_STATUSES_OF_TAKEN_JOBS = qq{'CLAIMED',$ALL_STATUSES_OF_RUNNING_JOBS};
-our $ALL_STATUSES_OF_COMPLETE_JOBS = q{'DONE','PASSED_ON'};
+our $ALL_STATUSES_OF_COMPLETE_JOBS = q{'DONE','PASSED_ON','REDUNDANT'};
 # Not in any list: SEMAPHORED, READY, COMPILATION (this one is actually not used), FAILED
 
 sub default_table_name {
@@ -128,13 +130,20 @@ sub fetch_by_analysis_id_and_input_id {     # It is a special case not covered b
 }
 
 
-sub class_specific_execute {
-    my ($self, $object, $sth, $values) = @_;
+sub check_job_uniqueness {
+    my ($self, $job) = @_;
 
-    my $return_code;
+    # Assumes the parameters have already been loaded
+    my $checksum = md5_hex(stringify($job->{'_unsubstituted_param_hash'}));
+
+    my $sql = 'INSERT INTO unique_job (analysis_id, param_checksum, representative_job_id) VALUES (?,?,?)';
+
+    my $is_redundant = 0;
 
     eval {
-        $return_code = $self->SUPER::class_specific_execute($object, $sth, $values);
+        $self->dbc->protected_prepare_execute( [ $sql, $job->analysis_id, $checksum, $job->dbID ],
+            sub { my ($after) = @_; $self->db->get_LogMessageAdaptor->store_hive_message( 'checking the job unicity'.$after, 'INFO' ); }
+        );
         1;
     } or do {
         my $duplicate_regex = {
@@ -144,20 +153,26 @@ sub class_specific_execute {
         }->{$self->db->dbc->driver};
 
         if( $@ =~ $duplicate_regex ) {      # implementing 'INSERT IGNORE' of Jobs on the API side
-            my $emitting_job_id = $object->prev_job_id;
-            my $analysis_id     = $object->analysis_id;
-            my $input_id        = $object->input_id;
-            my $msg             = "Attempt to insert a duplicate job (analysis_id=$analysis_id, input_id=$input_id) intercepted and ignored";
 
-            $self->db->get_LogMessageAdaptor->store_job_message( $emitting_job_id, $msg, 'INFO' );
+            my $other_sql = 'SELECT representative_job_id FROM unique_job WHERE analysis_id = ? AND param_checksum = ?';
+            my $other_job = $self->dbc->protected_select( [ $other_sql, $job->analysis_id, $checksum ],
+                sub { my ($after) = @_; $self->db->get_LogMessageAdaptor->store_hive_message( 'finding the representative job'.$after, 'INFO' ); }
+            );
+            my $other_job_id    = $other_job->[0]->{'representative_job_id'};
+            my $this_job_id     = $job->dbID;
+            my $analysis_id     = $job->analysis_id;
+            my $msg             = "Discarding this job because another job (job_id=$other_job_id) is already onto (analysis_id=$analysis_id, param_checksum=$checksum)";
 
-            $return_code = '0E0';
+            if ($other_job_id != $this_job_id) {
+                $self->db->get_LogMessageAdaptor->store_job_message( $this_job_id, $msg, 'INFO' );
+                $is_redundant = 1;
+            }
         } else {
             die $@;
         }
     };
 
-    return $return_code;
+    return $is_redundant;
 }
 
 
@@ -508,7 +523,7 @@ sub check_in_job {
         $sql .= ",when_completed=CURRENT_TIMESTAMP";
         $sql .= ",runtime_msec=".$job->runtime_msec;
         $sql .= ",query_count=".$job->query_count;
-    } elsif($job->status eq 'PASSED_ON') {
+    } elsif(($job->status eq 'PASSED_ON') or ($job->status eq 'REDUNDANT')) {
         $sql .= ", when_completed=CURRENT_TIMESTAMP";
     } elsif($job->status eq 'READY') {
     }
@@ -836,7 +851,7 @@ sub reset_jobs_for_analysis_id {
     my $statuses_filter = 'AND j.status IN ('.join(', ', map { "'$_'" } @$input_statuses).')';
 
     # Get the list of semaphores, and by how much their local_jobs_counter should be increased.
-    # Only DONE and PASSED_ON jobs of the matching analyses and statuses should be counted
+    # Only DONE, REDUNDANT and PASSED_ON jobs of the matching analyses and statuses should be counted
     #
     my $sql1 = qq{
         SELECT COUNT(*) AS local_delta, controlled_semaphore_id
