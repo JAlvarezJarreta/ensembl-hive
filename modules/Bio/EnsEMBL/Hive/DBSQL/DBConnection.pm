@@ -165,9 +165,19 @@ sub connect {       # a wrapper that imitates CSMA/CD protocol's incremental bac
     return $retval;
 }
 
+sub protected_prepare_execute {
+    my $self = shift;
+    return $self->_protected_prepare_execute(!'select', @_);
+}
 
-sub protected_prepare_execute {     # try to resolve certain mysql "Deadlocks" by imitating CSMA/CD protocol's incremental backoff-and-retry approach (a useful workaround even in mysql 5.1.61)
+sub protected_select {
+    my $self = shift;
+    return $self->_protected_prepare_execute('select', @_);
+}
+
+sub _protected_prepare_execute {     # try to resolve certain mysql "Deadlocks" by imitating CSMA/CD protocol's incremental backoff-and-retry approach (a useful workaround even in mysql 5.1.61)
     my $self                    = shift @_;
+    my $is_select               = shift @_;
     my $sql_params              = shift @_;
     my $deadlock_log_callback   = shift @_;
 
@@ -183,6 +193,7 @@ sub protected_prepare_execute {     # try to resolve certain mysql "Deadlocks" b
         eval {
             my $sth = $self->prepare( $sql_cmd );
             $retval = $sth->execute( @$sql_params );
+            $retval = $sth->fetchall_arrayref( {} ) if $is_select;
             $sth->finish;
             1;
         } or do {
