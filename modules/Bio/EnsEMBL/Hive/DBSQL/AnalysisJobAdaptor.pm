@@ -136,6 +136,16 @@ sub check_job_uniqueness {
     # Assumes the parameters have already been loaded
     my $checksum = md5_hex(stringify($job->{'_unsubstituted_param_hash'}));
 
+    # Check if this is a rerun (better not to trust retry_count
+    my $exist_sql = 'SELECT 1 FROM unique_job WHERE representative_job_id = ? AND param_checksum = ?';
+    my $exist_job = $self->dbc->protected_select( [ $exist_sql, $job->dbID, $checksum ],
+        sub { my ($after) = @_; $self->db->get_LogMessageAdaptor->store_hive_message( 'finding if the job has already run'.$after, 'INFO' ); }
+    );
+    if ($exist_job && scalar(@$exist_job)) {
+        # reruns don't count
+        return 0;
+    }
+
     my $sql = 'INSERT INTO unique_job (analysis_id, param_checksum, representative_job_id) VALUES (?,?,?)';
 
     my $is_redundant = 0;
@@ -158,15 +168,14 @@ sub check_job_uniqueness {
             my $other_job = $self->dbc->protected_select( [ $other_sql, $job->analysis_id, $checksum ],
                 sub { my ($after) = @_; $self->db->get_LogMessageAdaptor->store_hive_message( 'finding the representative job'.$after, 'INFO' ); }
             );
+
             my $other_job_id    = $other_job->[0]->{'representative_job_id'};
             my $this_job_id     = $job->dbID;
             my $analysis_id     = $job->analysis_id;
             my $msg             = "Discarding this job because another job (job_id=$other_job_id) is already onto (analysis_id=$analysis_id, param_checksum=$checksum)";
+            $self->db->get_LogMessageAdaptor->store_job_message( $this_job_id, $msg, 'INFO' );
 
-            if ($other_job_id != $this_job_id) {
-                $self->db->get_LogMessageAdaptor->store_job_message( $this_job_id, $msg, 'INFO' );
-                $is_redundant = 1;
-            }
+            $is_redundant = 1;
         } else {
             die $@;
         }
