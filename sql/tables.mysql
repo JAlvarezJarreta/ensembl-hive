@@ -410,6 +410,29 @@ CREATE TABLE semaphore (
 
 
 /**
+@table  unique_semaphore
+
+@colour #1D73DA
+
+@desc The unique_semaphore table ensures that a in each analysis, a given task (defined by its parameters) is only run once.
+      We record their pairs of (analysis_id, param_checksum) and the matching job_id. When new jobs are tried but are
+      found in this table, they are aborted.
+
+@column param_checksum                checksum over all the available funnel parameters, i.e. excluding the accu data that will be generated in the fan
+@column representative_semaphore_id   points at the semaphore that has been selected to run this analysis with these parameters
+*/
+
+CREATE TABLE unique_semaphore (
+    source_dataflow_rule_id       INTEGER     NOT NULL,
+    param_checksum                CHAR(32)    NOT NULL,
+    representative_semaphore_id   INTEGER     NOT NULL,
+
+    PRIMARY KEY df_rule_param (source_dataflow_rule_id, param_checksum),        -- to avoid repeating tasks
+            KEY representative_semaphore_id (representative_semaphore_id)
+) COLLATE=latin1_swedish_ci ENGINE=InnoDB;
+
+
+/**
 @table  job_file
 
 @colour #1D73DA
