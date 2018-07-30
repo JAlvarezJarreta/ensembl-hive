@@ -522,6 +522,7 @@ CREATE TABLE worker (
     temp_directory_name     VARCHAR(255)         DEFAULT NULL,
     log_dir                 VARCHAR(255)         DEFAULT NULL,
 
+    KEY resource_class_id (resource_class_id),
     KEY meadow_process (meadow_type, meadow_name, process_id)
 ) COLLATE=latin1_swedish_ci ENGINE=InnoDB;
 
@@ -593,7 +594,7 @@ CREATE TABLE role (
     done_jobs               INTEGER     NOT NULL DEFAULT 0,
 
     KEY worker   (worker_id),
-    KEY analysis (analysis_id)
+    KEY analysis_when_finished (analysis_id,when_finished)
 ) COLLATE=latin1_swedish_ci ENGINE=InnoDB;
 
 
@@ -728,7 +729,9 @@ CREATE TABLE analysis_stats_monitor (
 
     when_updated            TIMESTAMP                    NULL,  -- mysql's special for "TIMESTAMP DEFAULT NULL"
     sync_lock               SMALLINT    NOT NULL DEFAULT 0,
-    is_excluded             SMALLINT    NOT NULL DEFAULT 0
+    is_excluded             SMALLINT    NOT NULL DEFAULT 0,
+
+    KEY analysis_sync_lock  (analysis_id, sync_lock, when_logged)
 
 ) COLLATE=latin1_swedish_ci ENGINE=InnoDB;
 

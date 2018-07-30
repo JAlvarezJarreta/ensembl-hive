@@ -39,6 +39,7 @@ package Bio::EnsEMBL::Hive::AnalysisStats;
 use strict;
 use warnings;
 use List::Util 'sum';
+use Math::Trig;
 use POSIX;
 use Term::ANSIColor;
 
@@ -86,6 +87,13 @@ sub stats_expiration_date_sec {
 # of an analysis
 sub max_lock_sec {
     return 3600;
+}
+
+
+# How much time the worker will be pending. Queen will use this value when
+# there is no empirical data
+sub default_pending_time_sec {
+    return 30;
 }
 
 
@@ -305,6 +313,8 @@ sub estimate_num_required_workers {     # this doesn't count the workers that ar
     # NOTE: This is only greater than zero when jobs are quicker than $self->min_worker_runtime
     my $jobs_for_running_workers = $self->num_running_workers * ($num_jobs_per_worker - 1);
 
+    # FIXME add the concept of startup cost in seconds and target worker lifespan
+
     # NOTE: This means 1 worker per job when jobs_for_running_workers = 0 (no running workers or jobs take more than min_worker_runtime)
     my $num_required_workers = POSIX::ceil( ($jobs_to_do - $jobs_for_running_workers) / $num_jobs_per_worker);
     # NOTE: Since it can be negative when there are fewer jobs to do than what we have earmarked for running workers,
@@ -358,37 +368,77 @@ sub estimate_num_required_workers {     # this doesn't count the workers that ar
 }
 
 
-# avg_msec_per_job, or _estimate_avg_msec_per_job, or min_job_runtime_msec
+# avg_msec_per_job, or _estimate_avg_msec_per_job_from_active_roles, or min_job_runtime_msec
 sub get_or_estimate_avg_msec_per_job {
     my $self = shift;
 
+    # Cached value
+    return $self->{'_estimated_avg_msec_per_job'} if exists $self->{'_estimated_avg_msec_per_job'};
+
+    my $weight_factor       = 3; # makes it more sensitive to the dynamics of the farm
+    my $avg_msec_per_job    = $self->avg_msec_per_job;
+    my $job_count           = $self->done_job_count;
+    my $tot_msec_of_jobs    = $avg_msec_per_job * $job_count;
+
+    my $est_a               = $self->_estimate_avg_msec_per_job_from_active_roles;
+
+    if ($est_a) {
+    $tot_msec_of_jobs      += $est_a->[0];
+    $job_count             += $est_a->[1];
+    }
+
     unless ($self->avg_msec_per_job) {
         unless (exists $self->{'_estimated_avg_msec_per_job'}) {
-            $self->{'_estimated_avg_msec_per_job'} = $self->_estimate_avg_msec_per_job;
+            $self->{'_estimated_avg_msec_per_job'} = $self->_estimate_avg_msec_per_job_from_active_roles;
         }
         return $self->{'_estimated_avg_msec_per_job'} // $self->min_job_runtime_msec;
     }
     return $self->avg_msec_per_job;
 }
 
-sub _estimate_avg_msec_per_job {
+sub _estimate_avg_msec_per_job_from_active_roles {
     my $self = shift;
 
     return unless $self->num_running_workers;
 
     # No role has yet been finalized otherwise avg_msec_per_job would be set
-    my $active_roles = $self->adaptor->db->get_RoleAdaptor->fetch_all( 'when_finished IS NULL AND analysis_id=' . $self->analysis_id );
+    my $active_roles = $self->adaptor->db->get_RoleAdaptor->fetch_all( 'when_finished IS NULL AND seconds_since_when_started > 0 AND analysis_id=' . $self->analysis_id );
     return unless @$active_roles;
 
-    my $tot_lifespan_secs = sum( map {$_->seconds_since_when_started} @$active_roles );
-    return unless $tot_lifespan_secs;;
-
-    # Active roles are currently doing a job, which is not yet counted in attempted_jobs
-    my $tot_job_attempts = sum( map {$_->attempted_jobs+1} @$active_roles );
-
-    return 1000 * $tot_lifespan_secs / $tot_job_attempts;
+    # The distribution is log-normal
+    my $sum = 0;
+    my $n   = 0;
+    foreach my $role (@$active_roles) {
+        $sum += log($role->seconds_since_when_started);
+        $n   += $role->attempted_jobs + 0.5
+    }
+    my $avg_msec_per_job = 100 * exp($sum / $n);
+    return $avg_msec_per_job;
 }
 
+sub _reestimate_avg_msec_per_job_from_active_roles {
+    my $self = shift;
+
+    # FIXME default return values
+    return unless $self->num_running_workers;
+
+    # No role has yet been finalized otherwise avg_msec_per_job would be set
+    my $active_roles = $self->adaptor->db->get_RoleAdaptor->fetch_all( 'when_finished IS NULL AND seconds_since_when_started > 0 AND analysis_id=' . $self->analysis_id );
+    return unless @$active_roles;
+
+    # The distribution is log-normal
+    my $sum = 0;
+    my $n   = 0;
+    foreach my $role (@$active_roles) {
+        $sum += log(1000 * $role->seconds_since_when_started + $role->_estimate_current_job_runtime_msec($self));
+        $n   += $role->attempted_jobs + 1
+    }
+    my $curr_avg_msec_per_job = exp($sum / $n);
+    my $weight_factor = 3;
+    my $avg_msec_per_job = ($self->avg_msec_per_job * $self->done_job_count / $weight_factor + $curr_avg_msec_per_job)
+                           / ($self->done_job_count / $weight_factor + $n);
+    return $avg_msec_per_job;
+}
 
 sub get_job_throughput {
     my $self = shift;
@@ -520,6 +570,8 @@ sub _toString_fields {
 
     # We don't want to default to min_job_runtime_msec
     my ($avg_runtime, $avg_runtime_unit);
+    # FIXME: can these be joined ?
+    # This is to avoid the default min_job_runtime_msec
     $self->get_or_estimate_avg_msec_per_job;
     if ($self->avg_msec_per_job) {
         ($avg_runtime, $avg_runtime_unit) = $self->friendly_avg_job_runtime($self->avg_msec_per_job);

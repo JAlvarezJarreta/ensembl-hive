@@ -522,6 +522,8 @@ sub add_objects_from_config {
             $parameters_hash ||= {};    # in case nothing was given
             die "'-parameters' has to be a hash" unless(ref($parameters_hash) eq 'HASH');
 
+            $batch_size = 0;
+
             ($analysis) = $pipeline->add_new_or_update( 'Analysis', $self->o('hive_debug_init'),   # NB: add_new_or_update returns a list
                 'logic_name'            => $logic_name,
                 'module'                => $module,

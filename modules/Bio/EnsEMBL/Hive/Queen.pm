@@ -458,6 +458,26 @@ sub get_submitted_worker_counts_by_meadow_type_rc_name_for_meadow_user {
     return \%counts_by_meadow_type_rc_name;
 }
 
+sub get_average_pending_time_by_resource_class {
+    my ($self, $resource_class_id) = @_;
+
+    my $timestamp_diff_seconds = $self->dbc->_interval_seconds_sql('when_submitted', 'IFNULL(when_born,CURRENT_TIMESTAMP)');
+
+    my $sql = qq{
+        SELECT AVG($timestamp_diff_seconds)
+        FROM worker
+        WHERE when_submitted IS NOT NULL
+          AND when_born IS NOT NULL
+          AND resource_class_id IS NOT NULL AND resource_class_id = ?
+    };
+    my $sth = $self->prepare($sql);
+    $sth->execute($resource_class_id);
+    my ($avg_pending_time) = $sth->fetchrow_array();
+    $sth->finish;
+    return $avg_pending_time;
+}
+
+
 
 sub check_for_dead_workers {    # scans the whole Valley for lost Workers (but ignores unreachable ones)
     my ($self, $valley, $check_buried_in_haste, $bury_unkwn_workers) = @_;
@@ -736,6 +756,8 @@ sub synchronize_hive {
     print ''.((time() - $start_time))." seconds to synchronize_hive\n\n";
 }
 
+
+# FIXME: These two synchronization methods would fit better in AnalysisStats itself
 
 =head2 safe_synchronize_AnalysisStats
 
