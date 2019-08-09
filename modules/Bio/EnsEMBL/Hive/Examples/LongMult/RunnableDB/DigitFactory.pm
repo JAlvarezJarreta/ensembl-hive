@@ -78,14 +78,11 @@ sub fetch_input {
 
     my $b_multiplier    = $self->param_required('b_multiplier');
 
-    my %digit_hash = ();
+    my @sub_tasks;
     foreach my $digit (split(//,$b_multiplier)) {
 #        next if (($digit eq '0') or ($digit eq '1'));
-        $digit_hash{$digit}++;
+        push @sub_tasks, { 'digit' => $digit };
     }
-
-        # parameter hashes of partial multiplications to be computed:
-    my @sub_tasks = map { { 'digit' => $_ } } sort { $a <=> $b } keys %digit_hash;
 
         # store them for future use:
     $self->param('sub_tasks', \@sub_tasks);
