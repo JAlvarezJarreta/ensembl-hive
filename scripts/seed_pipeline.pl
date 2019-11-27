@@ -135,8 +135,7 @@ sub main {
     my ($semaphore_id, $job_id);
 
     if( $wrap_in_semaphore ) {
-        my $dummy;
-        ($semaphore_id, $dummy, $job_id) = $job_adaptor->store_a_semaphored_group_of_jobs( undef, [ $job ], undef );
+        ($semaphore_id, $job_id) = $job_adaptor->store_a_semaphored_group_of_jobs( undef, [ $job ], undef );
     } else {
         ($job_id) = @{ $job_adaptor->store_jobs_and_adjust_counters( [ $job ] ) };
     }

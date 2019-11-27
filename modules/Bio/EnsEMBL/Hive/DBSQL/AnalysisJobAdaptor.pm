@@ -238,7 +238,7 @@ sub store_jobs_and_adjust_counters {
 =cut
 
 sub store_a_semaphored_group_of_jobs {
-    my ($self, $funnel_job, $fan_jobs, $emitting_job, $no_leeching) = @_;
+    my ($self, $funnel_input_id, $fan_jobs, $emitting_job, $no_leeching, $dependent_dataflow_rule) = @_;
 
     my $emitting_job_id;
 
@@ -317,7 +317,7 @@ sub store_a_semaphored_group_of_jobs {
 
     my (@fan_job_ids) = @{ $self->store_jobs_and_adjust_counters( $fan_jobs, 1, $emitting_job_id) };
 
-    return ($funnel_semaphore->dbID, $funnel_job_id, @fan_job_ids);
+    return ($funnel_semaphore->dbID, @fan_job_ids);
 }
 
 

@@ -391,16 +391,11 @@ sub dataflow {
                 die "Asked to dataflow into $funnel_job_count funnel jobs instead of 1";
 
             } else {
-                my $funnel_job = Bio::EnsEMBL::Hive::AnalysisJob->new(
-                    @$common_params,
-                    'input_id'          => $output_ids_for_this_rule->[0],
-                    'status'            => 'SEMAPHORED',
-                );
 
                     # NB: $job_adaptor happens to belong to the $funnel_job, but not necesarily to $fan_jobs or $emitting_job
-                my ($semaphore_id, $funnel_job_id, @fan_job_ids) = $job_adaptor->store_a_semaphored_group_of_jobs( $funnel_job, $fan_jobs, $emitting_job );
+                my ($semaphore_id, @fan_job_ids) = $job_adaptor->store_a_semaphored_group_of_jobs( $output_ids_for_this_rule->[0], $fan_jobs, $emitting_job );
 
-                push @output_job_ids, $funnel_job_id, @fan_job_ids;
+                push @output_job_ids, @fan_job_ids;
             }
         } else {    # non-semaphored dataflow (but potentially propagating any existing semaphores)
             my @non_semaphored_jobs = map { Bio::EnsEMBL::Hive::AnalysisJob->new(
