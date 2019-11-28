@@ -102,9 +102,13 @@ sub status {
 sub attempt_count {
     my $self = shift;
     # Lazy-loaded
-    if ((not exists $self->{'_attempt_count'}) and $self->adaptor) {
+    unless (exists $self->{'_attempt_count'}) {
         # Cached because we don't expect the same AnalysisJob instance to live across multiple attempts
-        $self->{'_attempt_count'} = $self->adaptor->db->get_AttemptAdaptor->count_all_by_job_id($self->dbID);
+        if ($self->adaptor) {
+            $self->{'_attempt_count'} = $self->adaptor->db->get_AttemptAdaptor->count_all_by_job_id($self->dbID);
+        } else {
+            $self->{'_attempt_count'} = 1;
+        }
     }
     return $self->{'_attempt_count'};
 }
