@@ -343,12 +343,11 @@ CREATE TABLE job (
     when_created            TIMESTAMP   NOT NULL DEFAULT CURRENT_TIMESTAMP,
     role_id                 INTEGER              DEFAULT NULL,
     last_attempt_id         INTEGER              DEFAULT NULL,  -- the last attempt registered for this job
-    status                  ENUM('SEMAPHORED','READY','CLAIMED','IN_PROGRESS','DONE','FAILED','PASSED_ON') DEFAULT 'READY' NOT NULL,
+    status                  ENUM('SEMAPHORED','READY','CLAIMED','IN_PROGRESS','DONE','FAILED','PASSED_ON','REDUNDANT') DEFAULT 'READY' NOT NULL,
 
     controlled_semaphore_id INTEGER              DEFAULT NULL,      -- terminology: fan jobs CONTROL semaphores; funnel jobs or remote semaphores DEPEND ON (local) semaphores
 
-    UNIQUE  KEY input_id_stacks_analysis    (input_id, param_id_stack, accu_id_stack, analysis_id), -- to avoid repeating tasks
-            KEY analysis_status_attempted   (analysis_id, status, last_attempt_id),                 -- for claiming jobs
+    UNIQUE  KEY analysis_status_virgin      (analysis_id, status, last_attempt_id),                 -- for claiming jobs
             KEY role_status                 (role_id, status)                                       -- for fetching and releasing claimed jobs
 ) COLLATE=latin1_swedish_ci ENGINE=InnoDB;
 
@@ -375,7 +374,7 @@ CREATE TABLE attempt (
     attempt_id              INTEGER     NOT NULL PRIMARY KEY AUTO_INCREMENT,
     role_id                 INTEGER     NOT NULL,
     job_id                  INTEGER     NOT NULL,                  -- the job this attempt is about
-    status                  ENUM('INITIALIZATION','PRE_CLEANUP','FETCH_INPUT','RUN','WRITE_OUTPUT','POST_HEALTHCHECK','POST_CLEANUP','END') DEFAULT 'INITIALIZATION' NOT NULL,
+    status                  ENUM('INITIALIZATION','PARAM_CHECK','PRE_CLEANUP','FETCH_INPUT','RUN','WRITE_OUTPUT','POST_HEALTHCHECK','POST_CLEANUP','END') DEFAULT 'INITIALIZATION' NOT NULL,
     when_initialized        TIMESTAMP   NOT NULL DEFAULT CURRENT_TIMESTAMP,
     when_updated            TIMESTAMP                    NULL,      -- mysql's special for "TIMESTAMP DEFAULT NULL"
     when_ended              TIMESTAMP                    NULL,      -- mysql's special for "TIMESTAMP DEFAULT NULL"

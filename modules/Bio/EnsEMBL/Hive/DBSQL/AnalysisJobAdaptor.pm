@@ -45,6 +45,8 @@ package Bio::EnsEMBL::Hive::DBSQL::AnalysisJobAdaptor;
 use strict;
 use warnings;
 
+use Digest::MD5 qw(md5_hex);
+
 use Bio::EnsEMBL::Hive::Cacheable;
 use Bio::EnsEMBL::Hive::Semaphore;
 use Bio::EnsEMBL::Hive::DBSQL::DataflowRuleAdaptor;
@@ -102,6 +104,27 @@ sub job_status_cast {
     } else {
         return $status_string;
     }
+}
+
+
+sub is_redundant {
+    my ($self, $job) = @_;
+
+    # Assumes the parameters have already been loaded
+    my $checksum = md5_hex(stringify($job->{'_unsubstituted_param_hash'}));
+
+    my $representative_job_id = $self->db->get_UniqueJobAdaptor->find_or_register_representative($job->analysis_id, $checksum, $job->dbID);
+
+    if ($representative_job_id != $job->dbID) {
+        my $this_job_id     = $job->dbID;
+        my $analysis_id     = $job->analysis_id;
+        my $msg             = "Discarding this job because another job (job_id=$representative_job_id) is already onto (analysis_id=$analysis_id, param_checksum=$checksum)";
+        $self->db->get_LogMessageAdaptor->store_job_message( $this_job_id, $msg, 'INFO' );
+
+        return 1;
+    }
+
+    return 0;
 }
 
 

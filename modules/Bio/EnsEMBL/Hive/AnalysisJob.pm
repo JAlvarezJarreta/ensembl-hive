@@ -215,6 +215,12 @@ sub incomplete {            # Job should set this to 0 prior to throwing if the 
     return $self->{'_incomplete'};
 }
 
+sub redundant {             # Job should set this to 1 prior to throwing if the job parameters
+                            # match another job that has already been attempted
+    my $self = shift;
+    $self->{'_redundant'} = shift if(@_);
+    return $self->{'_redundant'};
+}
 
 sub died_somewhere {
     my $self = shift;

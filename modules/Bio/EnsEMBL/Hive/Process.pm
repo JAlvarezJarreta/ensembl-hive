@@ -140,6 +140,16 @@ sub life_cycle {
             $job->adaptor->db->get_AccumulatorAdaptor->remove_all_by_sending_job_id($job->dbID);
         }
 
+        if ($job->adaptor) {
+            $self->enter_status('PARAM_CHECK');
+
+            if ($job->adaptor->is_redundant()) {
+                $job->redundant(1);
+                $job->incomplete(0);
+                return;
+            }
+        }
+
         if( $self->can('pre_cleanup') and $job->attempt_count()>1 ) {
             $self->enter_status('PRE_CLEANUP');
             $self->pre_cleanup;
@@ -173,6 +183,8 @@ sub life_cycle {
     };
     # Restore the default handler
     #$SIG{__WARN__} = 'DEFAULT';
+
+    return if $job->redundant;
 
     if(my $life_cycle_msg = $@) {
         $job->died_somewhere( $job->incomplete );  # it will be OR'd inside
