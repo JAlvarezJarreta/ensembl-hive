@@ -388,6 +388,41 @@ CREATE TABLE attempt (
 ) COLLATE=latin1_swedish_ci ENGINE=InnoDB;
 
 /**
+@table  representative_job
+
+@colour #1D73DA
+
+@desc The representative_job table ensures that a in each analysis, a given task (defined by its parameters) is only run once.
+      We record their pairs of (analysis_id, param_checksum) and the matching job_id. When new jobs are tried but are
+      found in this table, they are aborted.
+
+@column analysis_id             the analysis_id needed to accomplish this job.
+@column param_checksum          checksum over all the job parameters (input_id and accumulator, incl. inherited ones)
+@column representative_job_id   points at the job that has been selected to run this analysis with these parameters
+*/
+
+CREATE TABLE representative_job (
+    analysis_id             INTEGER     NOT NULL,
+    param_checksum          CHAR(32)    NOT NULL,
+    representative_job_id   INTEGER     NOT NULL,
+
+    PRIMARY KEY analysis_params       (analysis_id, param_checksum),                                  -- to avoid repeating tasks
+            KEY representative_job_id (representative_job_id)
+) COLLATE=latin1_swedish_ci ENGINE=InnoDB;
+
+CREATE TABLE representative_semaphore (
+    analysis_id                   INTEGER     NOT NULL,
+    param_checksum                CHAR(32)    NOT NULL,
+    representative_semaphore_id   INTEGER     NOT NULL,
+
+    PRIMARY KEY analysis_params             (analysis_id, param_checksum),                                  -- to avoid repeating tasks
+            KEY representative_semaphore_id (representative_semaphore_id)
+) COLLATE=latin1_swedish_ci ENGINE=InnoDB;
+
+
+
+
+/**
 @table  semaphore
 
 @colour #1D73DA
@@ -407,6 +442,8 @@ CREATE TABLE attempt (
 
 CREATE TABLE semaphore (
     semaphore_id                INTEGER    NOT NULL PRIMARY KEY AUTO_INCREMENT,
+    analysis_id                 INTEGER    NOT NULL,
+    param_checksum              CHAR(32)   NOT NULL,
     local_jobs_counter          INTEGER             DEFAULT 0,
     remote_jobs_counter         INTEGER             DEFAULT 0,
     dependent_job_id            INTEGER             DEFAULT NULL,                                   -- Both should never be NULLs at the same time,
@@ -415,6 +452,18 @@ CREATE TABLE semaphore (
     UNIQUE KEY unique_dependent_job_id (dependent_job_id)                                           -- make sure two semaphores do not block the same job
 ) COLLATE=latin1_swedish_ci ENGINE=InnoDB;
 
+
+CREATE TABLE funnel_template (
+    semaphore_id            INTEGER     NOT NULL PRIMARY KEY,
+    emitting_job_id         INTEGER              DEFAULT NULL,  -- the job that created this semaphore using a dataflow rule
+    analysis_id             INTEGER     NOT NULL,
+    input_id                CHAR(255)   NOT NULL,
+    param_id_stack          CHAR(64)    NOT NULL DEFAULT '',
+    accu_id_stack           CHAR(64)    NOT NULL DEFAULT '',
+    when_created            TIMESTAMP   NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    UNIQUE  KEY input_id_stacks_analysis    (input_id, param_id_stack, accu_id_stack, analysis_id)  -- to avoid repeating tasks
+) COLLATE=latin1_swedish_ci ENGINE=InnoDB;
 
 /**
 @table  accu

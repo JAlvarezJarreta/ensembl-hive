@@ -128,19 +128,22 @@ sub is_redundant {
 }
 
 
-=head2 fetch_by_analysis_id_and_input_id
+=head2 fetch_semaphore_by_analysis_id_and_input_id
 
   Arg [1]    : Integer $analysis_id
   Arg [2]    : String $input_id
-  Example    : $funnel_job = $job_adaptor->fetch_by_analysis_id_and_input_id( $funnel_job->analysis->dbID, $funnel_job->input_id);
+  Example    : $funnel_job = $job_adaptor->fetch_semaphore_by_analysis_id_and_input_id( $funnel_job->analysis->dbID, $funnel_job->input_id);
   Description: Attempts to find the job by contents, then makes another attempt if the input_id is expected to have overflown into analysis_data
   Returntype : AnalysisJob object
 
 =cut
 
-sub fetch_by_analysis_id_and_input_id {     # It is a special case not covered by AUTOLOAD; note the lowercase _and_
+sub fetch_semaphore_by_analysis_id_and_input_id {
     my ($self, $analysis_id, $input_id) = @_;
 
+    # checksum input_id
+    # look into unique_semaphore table
+    # if found return job fetched
     my $job = $self->fetch_by_analysis_id_AND_input_id( $analysis_id, $input_id);
 
     if(!$job and length($input_id)>$self->default_overflow_limit->{input_id}) {
@@ -149,39 +152,6 @@ sub fetch_by_analysis_id_and_input_id {     # It is a special case not covered b
         }
     }
     return $job;
-}
-
-
-sub class_specific_execute {
-    my ($self, $object, $sth, $values) = @_;
-
-    my $return_code;
-
-    eval {
-        $return_code = $self->SUPER::class_specific_execute($object, $sth, $values);
-        1;
-    } or do {
-        my $duplicate_regex = {
-            'mysql'     => qr/Duplicate entry.+?for key/s,
-            'sqlite'    => qr/columns.+?are not unique|UNIQUE constraint failed/s,  # versions around 3.8 spit the first msg, versions around 3.15 - the second
-            'pgsql'     => qr/duplicate key value violates unique constraint/s,
-        }->{$self->db->dbc->driver};
-
-        if( $@ =~ $duplicate_regex ) {      # implementing 'INSERT IGNORE' of Jobs on the API side
-            my $emitting_job_id = $object->prev_job_id;
-            my $analysis_id     = $object->analysis_id;
-            my $input_id        = $object->input_id;
-            my $msg             = "Attempt to insert a duplicate job (analysis_id=$analysis_id, input_id=$input_id) intercepted and ignored";
-
-            $self->db->get_LogMessageAdaptor->store_job_message( $emitting_job_id, $msg, 'INFO' );
-
-            $return_code = '0E0';
-        } else {
-            die $@;
-        }
-    };
-
-    return $return_code;
 }
 
 
@@ -306,8 +276,16 @@ sub store_a_semaphored_group_of_jobs {
         $emitting_job_id = $emitting_job->dbID;
     }
 
-    my $funnel_semaphore;
+    # FIXME: don't know if it is a string or a hash
+    #my $funnel_checksum             = stringify($funnel_input_id);
     my $funnel_semaphore_adaptor    = $self->db->get_SemaphoreAdaptor;  # assuming $self was $funnel_job_adaptor
+    my $funnel_semaphore            = $funnel_semaphore_adaptor->fetch_by;
+
+    # INSERT IGNORE in semaphore table
+    # If already exists:
+    #   - leech
+    # Else:
+    #   - 
 
     my ($funnel_job_id)     = $funnel_job ? @{ $self->store_jobs_and_adjust_counters( [ $funnel_job ], 0, $emitting_job_id) } : ();
 
@@ -316,7 +294,8 @@ sub store_a_semaphored_group_of_jobs {
         if($no_leeching) {
             die "The funnel job could not be stored, but leeching was not allowed, so bailing out";
 
-        } elsif( $funnel_job = $self->fetch_by_analysis_id_and_input_id( $funnel_job->analysis->dbID, $funnel_job->input_id) ) {
+            # FIXME
+        } elsif( $funnel_job = $self->fetch_semaphore_by_analysis_id_and_input_id( $funnel_job->analysis->dbID, $funnel_job->input_id) ) {
             $funnel_job_id = $funnel_job->dbID;
 
             # If the job hasn't run yet, we can still block it

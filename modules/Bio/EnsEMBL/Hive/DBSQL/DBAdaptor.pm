@@ -221,6 +221,7 @@ our %adaptor_type_2_package_name = (
     'Semaphore'             => 'Bio::EnsEMBL::Hive::DBSQL::SemaphoreAdaptor',
     'Queen'                 => 'Bio::EnsEMBL::Hive::Queen',
     'UniqueJob'             => 'Bio::EnsEMBL::Hive::DBSQL::UniqueJobAdaptor',
+    'UniqueSempahore'       => 'Bio::EnsEMBL::Hive::DBSQL::UniqueSempahoreAdaptor',
 
         # aliases:
     'Job'                   => 'Bio::EnsEMBL::Hive::DBSQL::AnalysisJobAdaptor',
