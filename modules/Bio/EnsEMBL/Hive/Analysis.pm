@@ -40,6 +40,8 @@ use sort 'stable';
 use strict;
 use warnings;
 
+use Scalar::Util qw(weaken);
+
 use Bio::EnsEMBL::Hive::Utils ('stringify', 'throw');
 use Bio::EnsEMBL::Hive::AnalysisJob;
 use Bio::EnsEMBL::Hive::GuestProcess;
@@ -222,7 +224,12 @@ sub display_name {
 sub stats {
     my $self = shift @_;
 
-    return $self->hive_pipeline->collection_of( 'AnalysisStats' )->find_one_by('analysis', $self);
+    unless ($self->{'_stats'}) {
+        $self->{'_stats'} = $self->hive_pipeline->collection_of( 'AnalysisStats' )->find_one_by('analysis', $self);
+        # weaken the reference to avoid a reference cycle
+        weaken($self->{'_stats'});
+    }
+    return $self->{'_stats'};
 }
 
 
