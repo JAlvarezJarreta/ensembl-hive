@@ -41,6 +41,12 @@ sub new {
 }
 
 
+sub shallow_copy {
+    my $self = shift @_;
+    return Bio::EnsEMBL::Hive::Utils::Collection->new();
+}
+
+
 sub listref {
     my $self = shift @_;
 
@@ -281,7 +287,7 @@ sub forget_and_mark_for_deletion {
     $self->forget( $candidate );
 
     unless( $self->dark_collection ) {
-        $self->dark_collection( Bio::EnsEMBL::Hive::Utils::Collection->new );
+        $self->dark_collection( $self->shallow_copy );
     }
     $self->dark_collection->add( $candidate );
 }

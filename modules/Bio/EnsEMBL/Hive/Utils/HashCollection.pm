@@ -48,6 +48,12 @@ sub new {
 }
 
 
+sub shallow_copy {
+    my $self = shift @_;
+    return Bio::EnsEMBL::Hive::Utils::HashCollection->new(undef, $self->unique_attr);
+}
+
+
 sub unique_attr {
     my $self    = shift @_;
     if (@_) {
