@@ -88,7 +88,11 @@ sub new {
 
 sub dbID {
     my $self = shift;
-    $self->{'dbID'} = shift if(@_);
+    if (@_) {
+        my $dbID = shift;
+        throw("Can't change the dbID of $self") if $dbID && $self->{'dbID'};
+        $self->{'dbID'} = $dbID;
+    }
     return $self->{'dbID'};
 }
 
