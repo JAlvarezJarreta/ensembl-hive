@@ -29,6 +29,7 @@ use Bio::EnsEMBL::Hive::DBSQL::DBAdaptor;
 use Bio::EnsEMBL::Hive::Utils ('stringify', 'destringify', 'throw');
 use Bio::EnsEMBL::Hive::Utils::Collection;
 use Bio::EnsEMBL::Hive::Utils::HashCollection;
+use Bio::EnsEMBL::Hive::Utils::IndexedCollection;
 use Bio::EnsEMBL::Hive::Utils::PCL;
 use Bio::EnsEMBL::Hive::Utils::URL;
 
@@ -90,6 +91,16 @@ sub unambig_key {   # based on DBC's URL if present, otherwise on pipeline_name
 }
 
 
+my %dbID_field = (
+    'Analysis'                  => 'dbID',
+    'AnalysisCtrlRule'          => 'dbID',
+    'DataflowRule'              => 'dbID',
+    'DataflowTarget'            => 'dbID',
+    'ResourceClass'             => 'dbID',
+    'AnalysisStats'             => 'analysis_id',
+    'ResourceDescription'       => 'resource_class_id',
+);
+
 my %hash_keys = (
     'MetaParameters'            => 'meta_key',
     'PipelineWideParameters'    => 'param_name',
@@ -117,7 +128,12 @@ sub collection_of {
         if (my $unique_attr = $hash_keys{$type}) {
             $self->{'_cache_by_class'}->{$type} = Bio::EnsEMBL::Hive::Utils::HashCollection->new( $all_objects, $unique_attr );
         } else {
-            $self->{'_cache_by_class'}->{$type} = Bio::EnsEMBL::Hive::Utils::Collection->new( $all_objects );
+            # Heuristic: only build the dbID lookup if objects come from the database
+            if ($all_objects and @$all_objects and $dbID_field{$type}) {
+                $self->{'_cache_by_class'}->{$type} = Bio::EnsEMBL::Hive::Utils::IndexedCollection->new( $all_objects, $dbID_field{$type} );
+            } else {
+                $self->{'_cache_by_class'}->{$type} = Bio::EnsEMBL::Hive::Utils::Collection->new( $all_objects );
+            }
         }
     }
 
